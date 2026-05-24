@@ -1,33 +1,46 @@
-# quire
+# quire — project context
 
-Automated book acquisition pipeline: Goodreads Choice Awards SF list → Shelfmark → Calibre-Web-Automated.
+Personal automation. Watches book-list sources (starting with Goodreads Choice Awards SF), dedupes against Calibre-Web-Automated, hands off downloads to Shelfmark.
 
-## What this project does
+## Shape
 
-Watches the annual Goodreads Readers Choice SF list, checks CWA OPDS to filter already-owned titles, then triggers Shelfmark to download new ones. Books land in CWA ingest and are auto-processed into the library.
+- Python CLI tool, weekly cron on a small Alpine homelab host
+- Parameterized list-source config — adding a source is a config entry (+ maybe an extractor module), not a workflow rewrite
+- Fully automatic; no human approval gate
+- No n8n, no GitHub PAT, no remote config fetch — repo is code + templates, host carries `config.toml`
 
-## Stack
+## Services
 
-- n8n (orchestration, at n8n.radi8.org, on Kubernetes)
-- Shelfmark (book search and download)
-- Calibre-Web-Automated / CWA (library, OPDS, device sync)
-- Goodreads public HTML (source list, no auth)
+- **Shelfmark** — `https://shelfmark.radi8.org`, basic auth. In maintenance mode (stable). Download target already wired to CWA ingest.
+- **CWA** — `https://cwa.radi8.org`, basic auth. Signup is open; anonymous browsing is intentionally off. Create a dedicated read-only `quire` user for the pipeline rather than reusing admin.
 
-## Key unknowns — resolve first
+Credentials live in `config.toml` on the host (gitignored). A populated `config.template.toml` is checked into the repo.
 
-- Shelfmark search endpoint: capture via browser devtools
-- Shelfmark download endpoint: capture via browser devtools
-- CWA OPDS search: GET http://<cwa-host>/opds/search/<title>
+## Design decisions worth remembering
 
-Document in docs/api-discovery.md before building.
+- **Format priority**: epub > mobi > azw3
+- **Match strictness**: trust CWA's OPDS search; no client-side title/author normalization. CWA's ingest-time dedup is the safety net.
+- **Vote threshold**: dropped. Take all ~20 nominees per source; CWA dedup handles repeats.
+- **No-match handling**: skip + retry on next poll. State tracks retry count so we back off after N attempts.
+- **Cadence**: weekly year-round. Simpler than tracking which sources have active voting windows.
 
-## Repo structure
+## Repo layout
 
-- workflows/ — n8n workflow JSON exports
-- docs/ — API discovery notes, design decisions
-- PLAN.md — phased build plan
-- CLAUDE.md — this file
+- `src/quire/` — Python package
+- `sources/` — list-source definitions
+- `config.template.toml` — copy to `config.toml`, populate, gitignored
+- `docs/` — API discovery notes, design notes
+- `PLAN.md` — phased build plan
+- `README.md` — user-facing
+- `CLAUDE.md` — this file
 
 ## Owner
 
 Personal project, alanlaird. Not affiliated with arcwerx.
+
+## Open items (not in PLAN.md)
+
+- Pick the Alpine host that will run the cron
+- Create the read-only `quire` user in CWA
+- Rotate the shared basic-auth password after the pipeline is wired (tracked in `~/dotclaude/tasks.md`)
+- Decide email transport (deferred — picked at Phase 7)
