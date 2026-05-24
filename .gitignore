@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+
+config.toml
+state.sqlite
+state.json
+*.log
+
+.DS_Store
+.idea/
+.vscode/

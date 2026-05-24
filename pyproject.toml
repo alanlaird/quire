@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quire"
+version = "0.1.0"
+description = "Automated book acquisition: list sources -> CWA dedup -> Shelfmark download"
+requires-python = ">=3.11"
+dependencies = [
+    "click>=8.1",
+    "requests>=2.31",
+    "beautifulsoup4>=4.12",
+]
+
+[project.scripts]
+quire = "quire.cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]

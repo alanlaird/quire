@@ -1,0 +1,26 @@
+# Copy this file to config.toml and populate.
+# config.toml is gitignored.
+
+[shelfmark]
+base_url = "https://shelfmark.radi8.org"
+username = "REPLACE_ME"
+password = "REPLACE_ME"
+
+[cwa]
+base_url = "https://cwa.radi8.org"
+username = "quire"
+password = "REPLACE_ME"
+
+[state]
+# Where the state file lives. Created on first run.
+path = "./state.sqlite"
+
+[email]
+to = "alan@laird.net"
+# Transport details added in Phase 7.
+
+# One [[sources]] block per list source. Add more as needed.
+[[sources]]
+name = "goodreads-choice-awards-sf"
+kind = "goodreads_choice_awards"
+url_template = "https://www.goodreads.com/choiceawards/best-science-fiction-books-{year}"
