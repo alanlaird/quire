@@ -5,6 +5,7 @@ from pathlib import Path
 import click
 
 from quire import config as cfg
+from quire import sources as src
 
 
 @click.group()
@@ -40,3 +41,17 @@ def list_sources(ctx: click.Context) -> None:
     config: cfg.Config = ctx.obj["config"]
     for s in config.sources:
         click.echo(f"{s.name}\t{s.kind}\t{s.url_template}")
+
+
+@cli.command()
+@click.argument("name")
+@click.pass_context
+def fetch(ctx: click.Context, name: str) -> None:
+    config: cfg.Config = ctx.obj["config"]
+    source = next((s for s in config.sources if s.name == name), None)
+    if source is None:
+        raise click.ClickException(f"no source named {name!r}")
+    books = src.fetch(source)
+    click.echo(f"{source.name}: {len(books)} books")
+    for b in books:
+        click.echo(f"  {b.title} — {b.author}")
