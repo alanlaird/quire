@@ -6,7 +6,7 @@ Automated book acquisition: scrape curated book lists, skip what you already own
 
 Quire polls one or more book-list sources (starting with the Goodreads Readers Choice Awards Science Fiction list), filters out titles you already have in Calibre-Web-Automated (CWA), and triggers Shelfmark to download the rest. Shelfmark drops files into CWA's ingest folder, where CWA converts and shelves them automatically.
 
-It runs as a small CLI tool on a weekly cron — no manual steps after setup.
+It runs as a small CLI tool on a weekly cron, co-located on the host that runs Shelfmark and CWA. No manual steps after setup.
 
 ## Stack
 

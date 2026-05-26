@@ -15,7 +15,6 @@ class CWAAuth:
 @dataclass(frozen=True)
 class ShelfmarkAuth:
     base_url: str
-    library_cookie_token: str
 
 
 @dataclass(frozen=True)

@@ -1,15 +1,17 @@
 # Copy this file to config.toml and populate.
 # config.toml is gitignored.
+#
+# quire is intended to run on alienlord, alongside Shelfmark and CWA,
+# and reach both services via loopback. That bypasses Caddy's cookie
+# gate on Shelfmark and avoids a public-URL round trip for CWA.
+# For local development, set up `ssh -L 8083:localhost:8083 -L
+# 8084:localhost:8084 alienlord.toad.love` and keep the URLs below.
 
 [shelfmark]
-base_url = "https://shelfmark.radi8.org"
-# Value of the library_session cookie issued by library.radi8.org's auth gate.
-# Stored in the alienlord ansible vault as library_cookie_token. Sent on every
-# Shelfmark request to satisfy Caddy's substring cookie check.
-library_cookie_token = "REPLACE_ME"
+base_url = "http://localhost:8084"
 
 [cwa]
-base_url = "https://cwa.radi8.org"
+base_url = "http://localhost:8083"
 # Dedicated read-only user; not the admin.
 username = "quire"
 password = "REPLACE_ME"

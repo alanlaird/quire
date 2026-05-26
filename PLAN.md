@@ -2,15 +2,17 @@
 
 ## Overview
 
-Python CLI tool, weekly cron on a small Alpine host. Reads a parameterized list of book sources, dedupes against CWA OPDS, hands off to Shelfmark. State is a local file so reruns are safe.
+Python CLI tool, weekly cron on `alienlord` (Debian, same host as CWA + Shelfmark). Reads a parameterized list of book sources, dedupes against CWA OPDS, hands off to Shelfmark. State is a local file so reruns are safe.
+
+Co-locating on alienlord lets quire reach both services over loopback (`http://localhost:8083` for CWA, `http://localhost:8084` for Shelfmark), bypassing Caddy's cookie gate entirely. CWA's app-level OPDS basic auth still applies; Shelfmark is reachable without any auth from loopback.
 
 ## Prerequisites
 
-- Shelfmark instance running, with download destination pointed at CWA ingest (already wired)
-- Calibre-Web-Automated running with OPDS enabled
-- Dedicated read-only `quire` user created in CWA (don't reuse admin creds)
-- Python 3.11+ available on the target host
-- An Alpine homelab host with cron and persistent storage for the state file
+- Shelfmark instance running on alienlord at `localhost:8084`, with download destination pointed at CWA ingest (already wired)
+- Calibre-Web-Automated running on alienlord at `localhost:8083` with OPDS enabled
+- Dedicated read-only `quire` user created in CWA (already exists, role `ROLE_DOWNLOAD | ROLE_VIEWER`)
+- Python 3.11+ available on alienlord
+- For local dev: `ssh -L 8083:localhost:8083 -L 8084:localhost:8084 alienlord.toad.love`
 
 ## Phase 1 — Project skeleton + config
 
@@ -22,12 +24,7 @@ Python CLI tool, weekly cron on a small Alpine host. Reads a parameterized list 
 
 ## Phase 2 — API discovery (~1 hour)
 
-Before any scrape/download code, capture API shapes from browser devtools:
-
-1. Shelfmark search — open devtools Network tab, search a book, capture URL/method/params/headers
-2. Shelfmark download — click download, capture the request
-3. CWA OPDS — verify `GET https://cwa.radi8.org/opds/search/<title>` shape and auth
-4. Document in `docs/api-discovery.md`
+Before any Shelfmark integration, capture API shapes. CWA OPDS shape is confirmed (`GET /opds/search/{searchTerms}`, basic auth, Atom feed). Remaining work: Shelfmark search + download endpoints, captured via browser devtools and documented in `docs/api-discovery.md`.
 
 ## Phase 3 — Source extractors
 
@@ -61,7 +58,7 @@ Before any scrape/download code, capture API shapes from browser devtools:
 
 - Summary email to `alan@laird.net` after each run: queued, skipped (already owned), missed (no Shelfmark result)
 - Email transport TBD — pick simplest at implementation time
-- Deploy via crontab on the chosen Alpine host (weekly)
+- Deploy to alienlord via an ansible role in the existing alienlord repo (weekly crontab; venv under `/opt/quire`)
 
 ## Build order
 
