@@ -6,10 +6,16 @@ from pathlib import Path
 
 
 @dataclass(frozen=True)
-class ServiceAuth:
+class CWAAuth:
     base_url: str
     username: str
     password: str
+
+
+@dataclass(frozen=True)
+class ShelfmarkAuth:
+    base_url: str
+    library_cookie_token: str
 
 
 @dataclass(frozen=True)
@@ -21,8 +27,8 @@ class Source:
 
 @dataclass(frozen=True)
 class Config:
-    shelfmark: ServiceAuth
-    cwa: ServiceAuth
+    shelfmark: ShelfmarkAuth
+    cwa: CWAAuth
     state_path: Path
     email_to: str
     sources: list[Source]
@@ -33,8 +39,8 @@ def load(path: Path) -> Config:
         raw = tomllib.load(f)
 
     return Config(
-        shelfmark=ServiceAuth(**raw["shelfmark"]),
-        cwa=ServiceAuth(**raw["cwa"]),
+        shelfmark=ShelfmarkAuth(**raw["shelfmark"]),
+        cwa=CWAAuth(**raw["cwa"]),
         state_path=Path(raw["state"]["path"]).expanduser(),
         email_to=raw["email"]["to"],
         sources=[Source(**s) for s in raw["sources"]],

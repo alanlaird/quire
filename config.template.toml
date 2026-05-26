@@ -3,11 +3,14 @@
 
 [shelfmark]
 base_url = "https://shelfmark.radi8.org"
-username = "REPLACE_ME"
-password = "REPLACE_ME"
+# Value of the library_session cookie issued by library.radi8.org's auth gate.
+# Stored in the alienlord ansible vault as library_cookie_token. Sent on every
+# Shelfmark request to satisfy Caddy's substring cookie check.
+library_cookie_token = "REPLACE_ME"
 
 [cwa]
 base_url = "https://cwa.radi8.org"
+# Dedicated read-only user; not the admin.
 username = "quire"
 password = "REPLACE_ME"
 

@@ -5,6 +5,7 @@ from pathlib import Path
 import click
 
 from quire import config as cfg
+from quire import cwa as cwa_client
 from quire import sources as src
 
 
@@ -55,3 +56,23 @@ def fetch(ctx: click.Context, name: str) -> None:
     click.echo(f"{source.name}: {len(books)} books")
     for b in books:
         click.echo(f"  {b.title} — {b.author}")
+
+
+@cli.command()
+@click.argument("name")
+@click.pass_context
+def check(ctx: click.Context, name: str) -> None:
+    config: cfg.Config = ctx.obj["config"]
+    source = next((s for s in config.sources if s.name == name), None)
+    if source is None:
+        raise click.ClickException(f"no source named {name!r}")
+    books = src.fetch(source)
+    owned: list[src.Book] = []
+    missing: list[src.Book] = []
+    for b in books:
+        (owned if cwa_client.is_owned(config.cwa, b) else missing).append(b)
+    click.echo(f"{source.name}: {len(books)} books, {len(owned)} owned, {len(missing)} missing")
+    if missing:
+        click.echo("missing:")
+        for b in missing:
+            click.echo(f"  {b.title} — {b.author}")
