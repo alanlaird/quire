@@ -38,10 +38,65 @@ State (queued titles, retry counts) lives in a small local file so reruns are id
 
 - `src/quire/` — Python package
 - `config.template.toml` — example config; copy to `config.toml` (gitignored) and populate
-- `sources/` — list-source definitions (URL templates, extractors, schedule hints)
 - `PLAN.md` — phased build plan
 - `CLAUDE.md` — project context for Claude Code
 
+## Usage
+
+Set up a venv and install once:
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install -e .
+cp config.template.toml config.toml   # then edit
+```
+
+Inspect what's configured:
+
+```sh
+quire list-sources
+```
+
+Scrape a source and show the books it extracts. Default year is the current year from November on, the previous year otherwise (matches when the Goodreads Choice Awards page actually has data):
+
+```sh
+quire fetch goodreads-choice-awards-sf
+```
+
+Run it against a specific year — useful for smoke-testing extractors or backfilling:
+
+```sh
+quire fetch --year 2024 goodreads-choice-awards-sf
+quire fetch --year 2025 goodreads-choice-awards-sf
+```
+
+Show which books from a source are already in CWA (combines scrape + OPDS dedup, no downloads):
+
+```sh
+quire check goodreads-choice-awards-sf
+quire check --year 2024 goodreads-choice-awards-sf
+```
+
+Plan or execute the full pipeline (fetch + dedup + Shelfmark search + download):
+
+```sh
+quire run --dry-run                  # show what would happen, no downloads, no state writes
+quire run                            # do it
+quire run --year 2024                # one-off backfill of a prior year
+```
+
+Inspect the local state file (recorded queued / missed / gave-up entries):
+
+```sh
+quire state
+```
+
+Probe Shelfmark for a single title (handy for debugging matches):
+
+```sh
+quire shelfmark-search "Shroud" "Adrian Tchaikovsky"
+```
+
 ## Status
 
-Early development. Design complete, implementation in progress.
+Pipeline working end to end against a co-located Shelfmark + CWA stack. Phase 7 (email summary + ansible-deployed cron on alienlord) is the remaining work — see PLAN.md.

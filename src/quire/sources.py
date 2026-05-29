@@ -29,10 +29,10 @@ def register(kind: str) -> Callable[[Extractor], Extractor]:
     return decorator
 
 
-def fetch(source: Source) -> list[Book]:
+def fetch(source: Source, year: int | None = None) -> list[Book]:
     if source.kind not in _REGISTRY:
         raise ValueError(f"unknown source kind: {source.kind}")
-    url = source.url_template.format(year=_default_year())
+    url = source.url_template.format(year=year if year is not None else _default_year())
     html = _http_get(url)
     return _REGISTRY[source.kind](html)
 

@@ -27,8 +27,9 @@ def cli(ctx: click.Context, config_path: Path | None) -> None:
 
 @cli.command()
 @click.option("--dry-run", is_flag=True, help="Search Shelfmark but don't trigger downloads or write state.")
+@click.option("--year", type=int, default=None, help="Override the {year} substitution in source URLs (default: current year from Nov on, previous year otherwise).")
 @click.pass_context
-def run(ctx: click.Context, dry_run: bool) -> None:
+def run(ctx: click.Context, dry_run: bool, year: int | None) -> None:
     config: cfg.Config = ctx.obj["config"]
     queued = 0
     skipped_owned = 0
@@ -38,7 +39,7 @@ def run(ctx: click.Context, dry_run: bool) -> None:
     with st.open(config.state_path) as conn:
         for source in config.sources:
             click.echo(f"[{source.name}]")
-            books = src.fetch(source)
+            books = src.fetch(source, year=year)
             for book in books:
                 prior = st.get(conn, source.name, book)
                 if st.is_terminal(prior):
@@ -91,13 +92,14 @@ def list_sources(ctx: click.Context) -> None:
 
 @cli.command()
 @click.argument("name")
+@click.option("--year", type=int, default=None, help="Override the {year} substitution.")
 @click.pass_context
-def fetch(ctx: click.Context, name: str) -> None:
+def fetch(ctx: click.Context, name: str, year: int | None) -> None:
     config: cfg.Config = ctx.obj["config"]
     source = next((s for s in config.sources if s.name == name), None)
     if source is None:
         raise click.ClickException(f"no source named {name!r}")
-    books = src.fetch(source)
+    books = src.fetch(source, year=year)
     click.echo(f"{source.name}: {len(books)} books")
     for b in books:
         click.echo(f"  {b.title} — {b.author}")
@@ -105,13 +107,14 @@ def fetch(ctx: click.Context, name: str) -> None:
 
 @cli.command()
 @click.argument("name")
+@click.option("--year", type=int, default=None, help="Override the {year} substitution.")
 @click.pass_context
-def check(ctx: click.Context, name: str) -> None:
+def check(ctx: click.Context, name: str, year: int | None) -> None:
     config: cfg.Config = ctx.obj["config"]
     source = next((s for s in config.sources if s.name == name), None)
     if source is None:
         raise click.ClickException(f"no source named {name!r}")
-    books = src.fetch(source)
+    books = src.fetch(source, year=year)
     owned: list[src.Book] = []
     missing: list[src.Book] = []
     for b in books:
