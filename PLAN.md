@@ -56,9 +56,18 @@ Before any Shelfmark integration, capture API shapes. CWA OPDS shape is confirme
 
 ## Phase 7 — Email summary + cron
 
-- Summary email to `alan@laird.net` after each run: queued, skipped (already owned), missed (no Shelfmark result)
-- Email transport TBD — pick simplest at implementation time
-- Deploy to alienlord via an ansible role in the existing alienlord repo (weekly crontab; venv under `/opt/quire`)
+Done.
+
+- Summary email implemented in `src/quire/notify.py` (stdlib smtplib + STARTTLS). Sent after each live `quire run` unless `--no-email` is passed; dry-run never sends.
+- Transport reuses the existing alienlord Gmail SMTP credential (`smtp_login = ottomatethis@gmail.com`, password from vault key `cwa_mail_password`). Email goes to the global `email` var (`alan.laird@gmail.com`).
+- Deploy is an ansible role at `~/web/alienlord/roles/common/tasks/quire.yml`, wired into `playbook.yml` after the firewall step. The role clones to `/opt/quire`, builds a venv, `pip install -e .`'s the package, templates `/opt/quire/config.toml` (0600) from `roles/common/templates/quire-config.toml.j2`, and installs a Sunday 04:17 weekly cron that appends to `/var/log/quire.log`.
+
+### Deploy procedure
+
+1. Add `quire_cwa_password: "<value from quire/config.toml>"` to `~/web/alienlord/group_vars/all/vault.yml` (use `ansible-vault edit`).
+2. `cd ~/web/alienlord && ansible-playbook playbook.yml` (or limit to the quire role with `--start-at-task "Install quire (book acquisition pipeline)"`).
+3. Verify: `ssh alienlord.toad.love sudo /opt/quire/.venv/bin/quire --config /opt/quire/config.toml run --dry-run`.
+4. First real run will happen at the next Sunday 04:17, or trigger immediately by dropping `--dry-run`.
 
 ## Build order
 

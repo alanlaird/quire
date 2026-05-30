@@ -40,7 +40,10 @@ Credentials live in `config.toml` on alienlord (gitignored). A populated `config
 
 Personal project, alanlaird. Not affiliated with arcwerx.
 
+## Deploy
+
+quire is deployed to alienlord by the `quire` task in `~/web/alienlord/roles/common/tasks/quire.yml`. Vault keys it reads: `quire_cwa_password`, `cwa_mail_password`. Cron entry: `Sunday 04:17`, output appended to `/var/log/quire.log`.
+
 ## Open items (not in PLAN.md)
 
-- Decide email transport (deferred — picked at Phase 7)
-- Ansible role under `~/web/alienlord/roles/common/tasks/` (or its own role) to deploy quire: clone repo, create venv, install via `pip -e`, install crontab, drop a populated `config.toml`
+- (none — Phases 1–7 complete)

@@ -99,4 +99,4 @@ quire shelfmark-search "Shroud" "Adrian Tchaikovsky"
 
 ## Status
 
-Pipeline working end to end against a co-located Shelfmark + CWA stack. Phase 7 (email summary + ansible-deployed cron on alienlord) is the remaining work — see PLAN.md.
+Pipeline working end to end against a co-located Shelfmark + CWA stack. Deployed on alienlord via the `quire` task in the alienlord ansible repo; runs weekly via cron (Sunday 04:17), emails a summary to `alan.laird@gmail.com`.
