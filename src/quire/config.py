@@ -25,11 +25,21 @@ class Source:
 
 
 @dataclass(frozen=True)
+class EmailConfig:
+    to: str
+    from_addr: str
+    smtp_host: str
+    smtp_port: int
+    smtp_username: str
+    smtp_password: str
+
+
+@dataclass(frozen=True)
 class Config:
     shelfmark: ShelfmarkAuth
     cwa: CWAAuth
     state_path: Path
-    email_to: str
+    email: EmailConfig
     sources: list[Source]
 
 
@@ -37,11 +47,14 @@ def load(path: Path) -> Config:
     with path.open("rb") as f:
         raw = tomllib.load(f)
 
+    email_raw = dict(raw["email"])
+    email_raw["from_addr"] = email_raw.pop("from")
+
     return Config(
         shelfmark=ShelfmarkAuth(**raw["shelfmark"]),
         cwa=CWAAuth(**raw["cwa"]),
         state_path=Path(raw["state"]["path"]).expanduser(),
-        email_to=raw["email"]["to"],
+        email=EmailConfig(**email_raw),
         sources=[Source(**s) for s in raw["sources"]],
     )
 

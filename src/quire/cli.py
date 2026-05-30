@@ -6,6 +6,7 @@ import click
 
 from quire import config as cfg
 from quire import cwa as cwa_client
+from quire import notify
 from quire import shelfmark as sm
 from quire import sources as src
 from quire import state as st
@@ -26,19 +27,23 @@ def cli(ctx: click.Context, config_path: Path | None) -> None:
 
 
 @cli.command()
-@click.option("--dry-run", is_flag=True, help="Search Shelfmark but don't trigger downloads or write state.")
+@click.option("--dry-run", is_flag=True, help="Search Shelfmark but don't trigger downloads, write state, or send email.")
 @click.option("--year", type=int, default=None, help="Override the {year} substitution in source URLs (default: current year from Nov on, previous year otherwise).")
+@click.option("--no-email", is_flag=True, help="Don't send the summary email (live run only).")
 @click.pass_context
-def run(ctx: click.Context, dry_run: bool, year: int | None) -> None:
+def run(ctx: click.Context, dry_run: bool, year: int | None, no_email: bool) -> None:
     config: cfg.Config = ctx.obj["config"]
-    queued = 0
+    queued_lines: list[str] = []
+    missed_lines: list[str] = []
+    gave_up_lines: list[str] = []
     skipped_owned = 0
     skipped_state = 0
-    missed_no_match = 0
-    gave_up = 0
+    body_lines: list[str] = []
+
     with st.open(config.state_path) as conn:
         for source in config.sources:
             click.echo(f"[{source.name}]")
+            body_lines.append(f"[{source.name}]")
             books = src.fetch(source, year=year)
             for book in books:
                 prior = st.get(conn, source.name, book)
@@ -51,35 +56,57 @@ def run(ctx: click.Context, dry_run: bool, year: int | None) -> None:
                 releases = sm.search(config.shelfmark, book)
                 best = sm.pick_best(releases)
                 if best is None:
+                    line = f"{book.title} — {book.author}"
                     if dry_run:
-                        click.echo(f"  miss (dry-run): {book.title} — {book.author}")
+                        click.echo(f"  miss (dry-run): {line}")
                     else:
                         status = st.mark_missed(conn, source.name, book)
                         if status == st.STATUS_GAVE_UP:
-                            gave_up += 1
-                            click.echo(f"  gave up: {book.title} — {book.author}")
+                            gave_up_lines.append(line)
+                            click.echo(f"  gave up: {line}")
                         else:
-                            missed_no_match += 1
-                            click.echo(f"  miss: {book.title} — {book.author}")
+                            missed_lines.append(line)
+                            click.echo(f"  miss: {line}")
                     continue
                 label = f"{best.get('format')} {best.get('size')} via {best.get('indexer')}"
+                line = f"[{label}] {book.title} — {book.author}"
                 if dry_run:
-                    click.echo(f"  would queue [{label}]: {book.title} — {book.author}")
+                    click.echo(f"  would queue {line}")
                 else:
                     sm.download(config.shelfmark, best)
                     st.mark_queued(conn, source.name, book)
-                    click.echo(f"  queued     [{label}]: {book.title} — {book.author}")
-                queued += 1
+                    click.echo(f"  queued     {line}")
+                queued_lines.append(line)
+
     suffix = " (dry-run)" if dry_run else ""
     parts = [
-        f"{queued} queued",
+        f"{len(queued_lines)} queued",
         f"{skipped_owned} owned",
         f"{skipped_state} skipped",
-        f"{missed_no_match} no-match",
+        f"{len(missed_lines)} no-match",
     ]
-    if gave_up:
-        parts.append(f"{gave_up} gave up")
-    click.echo(f"summary{suffix}: " + ", ".join(parts))
+    if gave_up_lines:
+        parts.append(f"{len(gave_up_lines)} gave up")
+    summary = "summary" + suffix + ": " + ", ".join(parts)
+    click.echo(summary)
+
+    if dry_run or no_email:
+        return
+
+    body = [summary, ""]
+    if queued_lines:
+        body.append(f"queued ({len(queued_lines)}):")
+        body.extend(f"  {l}" for l in queued_lines)
+        body.append("")
+    if missed_lines:
+        body.append(f"no shelfmark match ({len(missed_lines)}):")
+        body.extend(f"  {l}" for l in missed_lines)
+        body.append("")
+    if gave_up_lines:
+        body.append(f"gave up ({len(gave_up_lines)}):")
+        body.extend(f"  {l}" for l in gave_up_lines)
+        body.append("")
+    notify.send(config.email, f"quire: {parts[0]}, {parts[3]}", "\n".join(body))
 
 
 @cli.command("list-sources")

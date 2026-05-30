@@ -21,8 +21,13 @@ password = "REPLACE_ME"
 path = "./state.sqlite"
 
 [email]
+# Summary email sent after each non-dry-run pipeline run.
 to = "alan@laird.net"
-# Transport details added in Phase 7.
+from = "ottomatethis@gmail.com"
+smtp_host = "smtp.gmail.com"
+smtp_port = 587
+smtp_username = "ottomatethis@gmail.com"
+smtp_password = "REPLACE_ME"
 
 # One [[sources]] block per list source. Add more as needed.
 [[sources]]
