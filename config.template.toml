@@ -28,6 +28,9 @@ smtp_host = "smtp.gmail.com"
 smtp_port = 587
 smtp_username = "ottomatethis@gmail.com"
 smtp_password = "REPLACE_ME"
+# When true, skip the summary email if the run produced no queued / missed /
+# gave-up entries. Default false sends every time as a weekly liveness ping.
+# suppress_if_no_change = true
 
 # One [[sources]] block per list source. Add more as needed.
 [[sources]]

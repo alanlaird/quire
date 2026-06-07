@@ -93,6 +93,15 @@ def run(ctx: click.Context, dry_run: bool, year: int | None, no_email: bool) -> 
     if dry_run or no_email:
         return
 
+    if (
+        config.email.suppress_if_no_change
+        and not queued_lines
+        and not missed_lines
+        and not gave_up_lines
+    ):
+        click.echo("nothing to report — summary email suppressed")
+        return
+
     body = [summary, ""]
     if queued_lines:
         body.append(f"queued ({len(queued_lines)}):")

@@ -32,6 +32,10 @@ class EmailConfig:
     smtp_port: int
     smtp_username: str
     smtp_password: str
+    # Default False keeps the existing "always send" behavior — useful as a
+    # weekly liveness ping. Flip to true to skip the email when nothing was
+    # queued / missed / gave up this run.
+    suppress_if_no_change: bool = False
 
 
 @dataclass(frozen=True)
