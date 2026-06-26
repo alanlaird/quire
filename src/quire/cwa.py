@@ -16,11 +16,11 @@ def is_owned(cwa: CWAAuth, book: Book) -> bool:
     url = f"{cwa.base_url.rstrip('/')}/opds/search/{quote(book.title, safe='')}"
     for attempt in range(4):
         try:
-            resp = requests.get(url, auth=(cwa.username, cwa.password), timeout=30)
+            resp = requests.get(url, auth=(cwa.username, cwa.password), timeout=60)
             resp.raise_for_status()
             root = ET.fromstring(resp.text)
             return root.find(f"{OPDS_NS}entry") is not None
-        except requests.exceptions.ConnectionError:
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
             if attempt == 3:
-                raise
-            time.sleep(5 * 2 ** attempt)  # 5s, 10s, 20s
+                return False  # CWA unreachable — assume not owned, let Shelfmark dedup
+            time.sleep(10 * 2 ** attempt)  # 10s, 20s, 40s
