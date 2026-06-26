@@ -42,7 +42,7 @@ def run(ctx: click.Context, dry_run: bool, year: int | None, no_email: bool) -> 
     body_lines: list[str] = []
 
     with st.open(config.state_path) as conn:
-        for source in config.sources:
+        for source in (s for s in config.sources if s.populate_list_id is None):
             click.echo(f"[{source.name}]")
             body_lines.append(f"[{source.name}]")
             books = src.fetch(source, config, year=year)
@@ -175,6 +175,47 @@ def check(ctx: click.Context, name: str, year: int | None) -> None:
         click.echo("missing:")
         for b in missing:
             click.echo(f"  {b.title} — {b.author}")
+
+
+@cli.command()
+@click.argument("name", required=False, default=None)
+@click.option("--year", type=int, default=None, help="Override the {year} substitution.")
+@click.option("--dry-run", is_flag=True, help="Search Hardcover but don't add to lists.")
+@click.pass_context
+def populate(ctx: click.Context, name: str | None, year: int | None, dry_run: bool) -> None:
+    """Scrape award nominees and add them to their Hardcover lists."""
+    config: cfg.Config = ctx.obj["config"]
+    if config.hardcover is None:
+        raise click.ClickException("populate requires [hardcover] config section")
+    sources = [s for s in config.sources if s.populate_list_id is not None]
+    if name:
+        sources = [s for s in sources if s.name == name]
+    if not sources:
+        raise click.ClickException(f"no populate sources found{f' named {name!r}' if name else ''}")
+
+    for source in sources:
+        click.echo(f"[{source.name}] → list {source.populate_list_id}")
+        books = src.fetch(source, config, year=year)
+        click.echo(f"  scraped: {len(books)} nominees")
+
+        existing_ids = {e["book_id"] for e in hc.get_list_books(config.hardcover.api_key, source.populate_list_id)}
+
+        n_added = n_present = n_missing = 0
+        for book in books:
+            book_id = hc.search_book(config.hardcover.api_key, book.title, book.author)
+            if book_id is None:
+                click.echo(f"  not found:     {book.title} — {book.author}")
+                n_missing += 1
+                continue
+            if book_id in existing_ids:
+                n_present += 1
+                continue
+            if not dry_run:
+                hc.add_to_list(config.hardcover.api_key, source.populate_list_id, book_id)
+            click.echo(f"  {'would add' if dry_run else 'added'}:      {book.title} — {book.author}")
+            n_added += 1
+
+        click.echo(f"  done: added={n_added}  already_present={n_present}  not_found={n_missing}")
 
 
 @cli.command()

@@ -28,7 +28,8 @@ class Source:
     name: str
     kind: str
     url_template: str | None = None
-    list_id: int | None = None
+    list_id: int | None = None        # for hardcover_list sources: read FROM this list
+    populate_list_id: int | None = None  # for scrape sources: write TO this list
 
 
 @dataclass(frozen=True)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import date
 from typing import TYPE_CHECKING, Callable
@@ -67,6 +68,77 @@ def _http_get(url: str) -> str:
     resp = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=30)
     resp.raise_for_status()
     return resp.text
+
+
+@register("nebula_nominees")
+def _nebula_nominees(html: str) -> list[Book]:
+    soup = BeautifulSoup(html, "html.parser")
+    heading = soup.find(
+        lambda t: t.name == "h4" and t.find("a", href=lambda h: h and "best-novel" in h)
+    )
+    if not heading:
+        return []
+    ul = heading.find_next_sibling("ul")
+    if not ul:
+        return []
+    books: list[Book] = []
+    seen: set[tuple[str, str]] = set()
+    for li in ul.find_all("li"):
+        # Each li: <a href="..."><em>Title, by Author (Publisher)</em></a>
+        em = li.find("em") or li.find("i", class_=False)
+        if em is None:
+            a = li.find("a")
+            text = _ws(a.get_text()) if a else ""
+        else:
+            text = _ws(em.get_text())
+        if ", by " not in text:
+            continue
+        title_part, _, author_part = text.partition(", by ")
+        title = _ws(title_part)
+        author = _ws(re.sub(r"\s*\(.*?\)\s*$", "", author_part).rstrip(";").strip())
+        if not title or not author:
+            continue
+        key = (title.lower(), author.lower())
+        if key not in seen:
+            seen.add(key)
+            books.append(Book(title=title, author=author))
+    return books
+
+
+@register("hugo_nominees")
+def _hugo_nominees(html: str) -> list[Book]:
+    soup = BeautifulSoup(html, "html.parser")
+    heading = None
+    for tag in soup.find_all(["h2", "h3", "h4", "strong", "b"]):
+        if "Best Novel" in tag.get_text():
+            heading = tag
+            break
+    if not heading:
+        return []
+    ul = heading.find_next("ul")
+    if not ul:
+        return []
+    books: list[Book] = []
+    seen: set[tuple[str, str]] = set()
+    for li in ul.find_all("li"):
+        em = li.find("em") or li.find("i")
+        if not em:
+            continue
+        title = _ws(em.get_text())
+        rest = li.get_text()
+        idx = rest.find(title)
+        after = rest[idx + len(title):] if idx != -1 else rest
+        if " by " not in after:
+            continue
+        author_part = after.split(" by ", 1)[1]
+        author = _ws(re.sub(r"\(.*?\)", "", author_part).strip().rstrip(","))
+        if not title or not author:
+            continue
+        key = (title.lower(), author.lower())
+        if key not in seen:
+            seen.add(key)
+            books.append(Book(title=title, author=author))
+    return books
 
 
 @register("goodreads_choice_awards")

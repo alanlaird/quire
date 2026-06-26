@@ -97,3 +97,24 @@ def add_to_list(api_key: str, list_id: int, book_id: int) -> None:
         "mutation($obj: ListBookInput!) { insert_list_book(object: $obj) { id } }",
         {"obj": {"list_id": list_id, "book_id": book_id}},
     )
+
+
+def search_book(api_key: str, title: str, author: str) -> int | None:
+    """Search Hardcover by title+author, return book_id or None."""
+    d = gql(
+        api_key,
+        'query($q: String!) { search(query: $q, query_type: "book", per_page: 3) { results } }',
+        {"q": f"{title} {author}".strip()},
+    )
+    results = (d.get("search") or {}).get("results")
+    if not results:
+        return None
+    if isinstance(results, list):
+        results = results[0] if results else {}
+    hits = results.get("hits", []) if isinstance(results, dict) else []
+    if not hits:
+        return None
+    raw_id = hits[0].get("document", {}).get("id")
+    if not raw_id:
+        return None
+    return int(raw_id) if not isinstance(raw_id, int) else raw_id
