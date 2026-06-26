@@ -18,10 +18,17 @@ class ShelfmarkAuth:
 
 
 @dataclass(frozen=True)
+class HardcoverAuth:
+    api_key: str
+    year_list_id: int  # list id for the current acquisition year (e.g. 450654 for "2026")
+
+
+@dataclass(frozen=True)
 class Source:
     name: str
     kind: str
-    url_template: str
+    url_template: str | None = None
+    list_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -45,6 +52,7 @@ class Config:
     state_path: Path
     email: EmailConfig
     sources: list[Source]
+    hardcover: HardcoverAuth | None = None
 
 
 def load(path: Path) -> Config:
@@ -54,12 +62,17 @@ def load(path: Path) -> Config:
     email_raw = dict(raw["email"])
     email_raw["from_addr"] = email_raw.pop("from")
 
+    hardcover = None
+    if "hardcover" in raw:
+        hardcover = HardcoverAuth(**raw["hardcover"])
+
     return Config(
         shelfmark=ShelfmarkAuth(**raw["shelfmark"]),
         cwa=CWAAuth(**raw["cwa"]),
         state_path=Path(raw["state"]["path"]).expanduser(),
         email=EmailConfig(**email_raw),
         sources=[Source(**s) for s in raw["sources"]],
+        hardcover=hardcover,
     )
 
 

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 import requests
 from bs4 import BeautifulSoup
 
 from quire.config import Source
+
+if TYPE_CHECKING:
+    from quire.config import Config
 
 USER_AGENT = "quire/0.1 (+https://github.com/alanlaird/quire)"
 
@@ -16,6 +19,7 @@ USER_AGENT = "quire/0.1 (+https://github.com/alanlaird/quire)"
 class Book:
     title: str
     author: str
+    hardcover_book_id: int | None = field(default=None, compare=False, hash=False)
 
 
 Extractor = Callable[[str], list[Book]]
@@ -29,9 +33,22 @@ def register(kind: str) -> Callable[[Extractor], Extractor]:
     return decorator
 
 
-def fetch(source: Source, year: int | None = None) -> list[Book]:
+def fetch(source: Source, config: "Config", year: int | None = None) -> list[Book]:
+    if source.kind == "hardcover_list":
+        import quire.hardcover as hc
+        if config.hardcover is None:
+            raise ValueError("hardcover_list source requires [hardcover] config section")
+        if source.list_id is None:
+            raise ValueError(f"source {source.name!r} is missing list_id")
+        entries = hc.get_list_books(config.hardcover.api_key, source.list_id)
+        return [
+            Book(title=e["title"], author=e["author"], hardcover_book_id=e["book_id"])
+            for e in entries
+        ]
     if source.kind not in _REGISTRY:
-        raise ValueError(f"unknown source kind: {source.kind}")
+        raise ValueError(f"unknown source kind: {source.kind!r}")
+    if source.url_template is None:
+        raise ValueError(f"source {source.name!r} is missing url_template")
     url = source.url_template.format(year=year if year is not None else _default_year())
     html = _http_get(url)
     return _REGISTRY[source.kind](html)

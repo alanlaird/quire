@@ -6,6 +6,7 @@ import click
 
 from quire import config as cfg
 from quire import cwa as cwa_client
+from quire import hardcover as hc
 from quire import notify
 from quire import shelfmark as sm
 from quire import sources as src
@@ -44,7 +45,7 @@ def run(ctx: click.Context, dry_run: bool, year: int | None, no_email: bool) -> 
         for source in config.sources:
             click.echo(f"[{source.name}]")
             body_lines.append(f"[{source.name}]")
-            books = src.fetch(source, year=year)
+            books = src.fetch(source, config, year=year)
             for book in books:
                 prior = st.get(conn, source.name, book)
                 if st.is_terminal(prior):
@@ -76,6 +77,20 @@ def run(ctx: click.Context, dry_run: bool, year: int | None, no_email: bool) -> 
                     sm.download(config.shelfmark, best)
                     st.mark_queued(conn, source.name, book)
                     click.echo(f"  queued     {line}")
+                    if book.hardcover_book_id is not None and config.hardcover is not None:
+                        try:
+                            hc.remove_from_list(
+                                config.hardcover.api_key,
+                                source.list_id,
+                                book.hardcover_book_id,
+                            )
+                            hc.add_to_list(
+                                config.hardcover.api_key,
+                                config.hardcover.year_list_id,
+                                book.hardcover_book_id,
+                            )
+                        except Exception as e:
+                            click.echo(f"  [hardcover list update failed: {e}]")
                 queued_lines.append(line)
 
     suffix = " (dry-run)" if dry_run else ""
@@ -135,7 +150,7 @@ def fetch(ctx: click.Context, name: str, year: int | None) -> None:
     source = next((s for s in config.sources if s.name == name), None)
     if source is None:
         raise click.ClickException(f"no source named {name!r}")
-    books = src.fetch(source, year=year)
+    books = src.fetch(source, config, year=year)
     click.echo(f"{source.name}: {len(books)} books")
     for b in books:
         click.echo(f"  {b.title} — {b.author}")
@@ -150,7 +165,7 @@ def check(ctx: click.Context, name: str, year: int | None) -> None:
     source = next((s for s in config.sources if s.name == name), None)
     if source is None:
         raise click.ClickException(f"no source named {name!r}")
-    books = src.fetch(source, year=year)
+    books = src.fetch(source, config, year=year)
     owned: list[src.Book] = []
     missing: list[src.Book] = []
     for b in books:
