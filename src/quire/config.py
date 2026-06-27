@@ -10,6 +10,7 @@ class CWAAuth:
     base_url: str
     username: str
     password: str
+    calibre_db: str = "/var/calibre-library/metadata.db"
 
 
 @dataclass(frozen=True)

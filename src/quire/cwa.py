@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import time
 import xml.etree.ElementTree as ET
 from urllib.parse import quote
@@ -20,8 +21,6 @@ def _cwa_get(cwa: CWAAuth, url: str) -> requests.Response:
             return requests.get(url, auth=(cwa.username, cwa.password), timeout=60)
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
             time.sleep(delay)
-    # Retries exhausted — enter wait loop until CWA recovers
-    import sys
     wait = 60
     while True:
         print(f"[cwa] unresponsive — waiting {wait}s before retry", file=sys.stderr, flush=True)
@@ -33,10 +32,23 @@ def _cwa_get(cwa: CWAAuth, url: str) -> requests.Response:
             continue
 
 
-def is_owned(cwa: CWAAuth, book: Book) -> bool:
+def load_library(cwa: CWAAuth) -> set[str]:
+    """Read all titles from Calibre metadata.db directly. Returns lowercased title set."""
+    import sqlite3
+    db = cwa.calibre_db
+    conn = sqlite3.connect(db, timeout=30)
+    try:
+        rows = conn.execute("SELECT title FROM books").fetchall()
+        return {r[0].lower() for r in rows}
+    finally:
+        conn.close()
+
+
+def is_owned(cwa: CWAAuth, book: Book, library: set[str] | None = None) -> bool:
+    if library is not None:
+        return book.title.lower() in library
     url = f"{cwa.base_url.rstrip('/')}/opds/search/{quote(book.title, safe='')}"
     resp = _cwa_get(cwa, url)
-    time.sleep(0.5)  # don't hammer CWA with back-to-back OPDS searches
     resp.raise_for_status()
     root = ET.fromstring(resp.text)
     return root.find(f"{OPDS_NS}entry") is not None
