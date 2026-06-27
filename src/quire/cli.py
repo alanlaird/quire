@@ -9,6 +9,7 @@ from quire import cwa as cwa_client
 from quire import hardcover as hc
 from quire import notify
 from quire import shelfmark as sm
+from quire.shelfmark import DownloadError
 from quire import sources as src
 from quire import state as st
 
@@ -41,6 +42,10 @@ def run(ctx: click.Context, dry_run: bool, year: int | None, no_email: bool) -> 
     skipped_state = 0
     body_lines: list[str] = []
 
+    click.echo("loading CWA library...")
+    library = cwa_client.load_library(config.cwa)
+    click.echo(f"CWA library: {len(library)} titles")
+
     with st.open(config.state_path) as conn:
         for source in (s for s in config.sources if s.populate_list_id is None):
             click.echo(f"[{source.name}]")
@@ -51,7 +56,7 @@ def run(ctx: click.Context, dry_run: bool, year: int | None, no_email: bool) -> 
                 if st.is_terminal(prior):
                     skipped_state += 1
                     continue
-                if cwa_client.is_owned(config.cwa, book):
+                if cwa_client.is_owned(config.cwa, book, library=library):
                     skipped_owned += 1
                     continue
                 releases = sm.search(config.shelfmark, book)
@@ -74,7 +79,11 @@ def run(ctx: click.Context, dry_run: bool, year: int | None, no_email: bool) -> 
                 if dry_run:
                     click.echo(f"  would queue {line}")
                 else:
-                    sm.download(config.shelfmark, best)
+                    try:
+                        sm.download(config.shelfmark, best)
+                    except DownloadError as e:
+                        click.echo(f"  download error: {e} — skipping {book.title}")
+                        continue
                     st.mark_queued(conn, source.name, book)
                     click.echo(f"  queued     {line}")
                     if book.hardcover_book_id is not None and config.hardcover is not None:

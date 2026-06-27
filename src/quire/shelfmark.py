@@ -27,7 +27,14 @@ def pick_best(releases: list[dict[str, Any]]) -> dict[str, Any] | None:
     return None
 
 
+class DownloadError(Exception):
+    pass
+
+
 def download(shelfmark: ShelfmarkAuth, release: dict[str, Any]) -> None:
     url = f"{shelfmark.base_url.rstrip('/')}/api/releases/download"
     resp = requests.post(url, json=release, timeout=60)
-    resp.raise_for_status()
+    try:
+        resp.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        raise DownloadError(str(e)) from e
