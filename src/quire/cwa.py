@@ -36,6 +36,7 @@ def _cwa_get(cwa: CWAAuth, url: str) -> requests.Response:
 def is_owned(cwa: CWAAuth, book: Book) -> bool:
     url = f"{cwa.base_url.rstrip('/')}/opds/search/{quote(book.title, safe='')}"
     resp = _cwa_get(cwa, url)
+    time.sleep(0.5)  # don't hammer CWA with back-to-back OPDS searches
     resp.raise_for_status()
     root = ET.fromstring(resp.text)
     return root.find(f"{OPDS_NS}entry") is not None
