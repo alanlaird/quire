@@ -55,6 +55,10 @@ class DownloadError(Exception):
 def download(shelfmark: ShelfmarkAuth, release: dict[str, Any]) -> None:
     url = f"{shelfmark.base_url.rstrip('/')}/api/releases/download"
     resp = requests.post(url, json=release, timeout=60)
+    if resp.status_code == 500:
+        body = resp.json() if resp.content else {}
+        if "already in the download queue" in body.get("error", ""):
+            return
     try:
         resp.raise_for_status()
     except requests.exceptions.HTTPError as e:
