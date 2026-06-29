@@ -104,6 +104,17 @@ def run(ctx: click.Context, dry_run: bool, year: int | None, no_email: bool) -> 
                             click.echo(f"  [hardcover list update failed: {e}]")
                 queued_lines.append(line)
 
+    if not dry_run and config.metrics:
+        with st.open_metrics(config.metrics.path) as mconn:
+            st.record_run(
+                mconn,
+                queued=len(queued_lines),
+                owned=skipped_owned,
+                skipped=skipped_state,
+                no_match=len(missed_lines),
+                gave_up=len(gave_up_lines),
+            )
+
     suffix = " (dry-run)" if dry_run else ""
     parts = [
         f"{len(queued_lines)} queued",

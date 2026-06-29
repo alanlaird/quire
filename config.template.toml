@@ -32,6 +32,11 @@ smtp_password = "REPLACE_ME"
 # gave-up entries. Default false sends every time as a weekly liveness ping.
 # suppress_if_no_change = true
 
+# Optional: write per-run stats to a SQLite file for Grafana dashboards.
+# On alienlord the path points to the NFS share so hemlock's Grafana can read it.
+# [metrics]
+# path = "/mnt/fir/books/quire-runs.sqlite"
+
 # One [[sources]] block per list source. Add more as needed.
 [[sources]]
 name = "goodreads-choice-awards-sf"

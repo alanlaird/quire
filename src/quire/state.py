@@ -101,6 +101,48 @@ def mark_missed(conn: sqlite3.Connection, source: str, book: Book) -> str:
     return status
 
 
+_RUNS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS runs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_date    TEXT NOT NULL,
+    queued      INTEGER NOT NULL DEFAULT 0,
+    owned       INTEGER NOT NULL DEFAULT 0,
+    skipped     INTEGER NOT NULL DEFAULT 0,
+    no_match    INTEGER NOT NULL DEFAULT 0,
+    gave_up     INTEGER NOT NULL DEFAULT 0
+);
+"""
+
+
+@contextmanager
+def open_metrics(path: Path) -> Iterator[sqlite3.Connection]:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    conn.executescript(_RUNS_SCHEMA)
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def record_run(
+    conn: sqlite3.Connection,
+    *,
+    queued: int,
+    owned: int,
+    skipped: int,
+    no_match: int,
+    gave_up: int,
+) -> None:
+    conn.execute(
+        "INSERT INTO runs (run_date, queued, owned, skipped, no_match, gave_up) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (_now(), queued, owned, skipped, no_match, gave_up),
+    )
+
+
 def all_rows(conn: sqlite3.Connection) -> list[Row]:
     return [
         Row(**dict(r))

@@ -48,6 +48,11 @@ class EmailConfig:
 
 
 @dataclass(frozen=True)
+class MetricsConfig:
+    path: Path
+
+
+@dataclass(frozen=True)
 class Config:
     shelfmark: ShelfmarkAuth
     cwa: CWAAuth
@@ -55,6 +60,7 @@ class Config:
     email: EmailConfig
     sources: list[Source]
     hardcover: HardcoverAuth | None = None
+    metrics: MetricsConfig | None = None
 
 
 def load(path: Path) -> Config:
@@ -68,6 +74,10 @@ def load(path: Path) -> Config:
     if "hardcover" in raw:
         hardcover = HardcoverAuth(**raw["hardcover"])
 
+    metrics = None
+    if "metrics" in raw:
+        metrics = MetricsConfig(path=Path(raw["metrics"]["path"]).expanduser())
+
     return Config(
         shelfmark=ShelfmarkAuth(**raw["shelfmark"]),
         cwa=CWAAuth(**raw["cwa"]),
@@ -75,6 +85,7 @@ def load(path: Path) -> Config:
         email=EmailConfig(**email_raw),
         sources=[Source(**s) for s in raw["sources"]],
         hardcover=hardcover,
+        metrics=metrics,
     )
 
 
