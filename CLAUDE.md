@@ -54,5 +54,4 @@ quire is deployed to alienlord by the `quire` task in `~/web/alienlord/roles/com
 
 ## Open items (not in PLAN.md)
 
-- quire state DB doesn't write "owned" back when book is found in CWA; stays "queued" indefinitely (cosmetic, doesn't affect function)
-- Cixin Liu short story 500s: "The Wandering Earth" anthology already queued when individual story titles arrive — Shelfmark returns 500 "already in queue" for Sun of China, Mountain, Wages of Humanity
+- (none)
