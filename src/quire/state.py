@@ -11,6 +11,7 @@ from quire.sources import Book
 
 MAX_MISS_RETRIES = 4
 STATUS_QUEUED = "queued"
+STATUS_OWNED = "owned"
 STATUS_MISSED = "missed"
 STATUS_GAVE_UP = "gave_up"
 
@@ -62,11 +63,7 @@ def get(conn: sqlite3.Connection, source: str, book: Book) -> Row | None:
 def is_terminal(row: Row | None) -> bool:
     if row is None:
         return False
-    if row.status == STATUS_QUEUED:
-        return True
-    if row.status == STATUS_GAVE_UP:
-        return True
-    return False
+    return row.status in (STATUS_QUEUED, STATUS_OWNED, STATUS_GAVE_UP)
 
 
 def mark_queued(conn: sqlite3.Connection, source: str, book: Book) -> None:
@@ -76,6 +73,16 @@ def mark_queued(conn: sqlite3.Connection, source: str, book: Book) -> None:
         "ON CONFLICT(source, title, author) DO UPDATE SET "
         "  status=excluded.status, retry_count=0, last_attempted=excluded.last_attempted",
         (source, book.title, book.author, STATUS_QUEUED, _now()),
+    )
+
+
+def mark_owned(conn: sqlite3.Connection, source: str, book: Book) -> None:
+    conn.execute(
+        "INSERT INTO books (source, title, author, status, retry_count, last_attempted) "
+        "VALUES (?, ?, ?, ?, 0, ?) "
+        "ON CONFLICT(source, title, author) DO UPDATE SET "
+        "  status=excluded.status, retry_count=0, last_attempted=excluded.last_attempted",
+        (source, book.title, book.author, STATUS_OWNED, _now()),
     )
 
 

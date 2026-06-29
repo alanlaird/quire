@@ -58,6 +58,8 @@ def run(ctx: click.Context, dry_run: bool, year: int | None, no_email: bool) -> 
                     continue
                 if cwa_client.is_owned(config.cwa, book, library=library):
                     skipped_owned += 1
+                    if not dry_run:
+                        st.mark_owned(conn, source.name, book)
                     continue
                 releases = sm.search(config.shelfmark, book)
                 best = sm.pick_best(releases)
