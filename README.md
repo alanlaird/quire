@@ -11,7 +11,9 @@ It runs as a small CLI tool on a weekly cron, co-located on the host that runs S
 ## Stack
 
 - **Goodreads** (and other list sources, parameterized) — public HTML, scraped
-- **Shelfmark** — search + download broker
+- **Shelfmark** — search + download broker; tries AA (direct download) first, falls back to Prowlarr/MAM
+- **hemlock** — KVM VM running qBittorrent + mlm via WireGuard VPN; seeds MAM downloads to `/pool/books/seed`, copies to `/pool/books/ingest`
+- **fir** — NAS exporting `/pool/books/{seed,ingest,library}` over NFS to alienlord and hemlock
 - **Calibre-Web-Automated** — library ingest, dedup, format conversion, device sync
 
 ## Architecture
@@ -25,9 +27,12 @@ It runs as a small CLI tool on a weekly cron, co-located on the host that runs S
          |
 [quire: Shelfmark search -> pick best (epub > mobi > azw3)]
          |
-[Shelfmark: download into CWA ingest dir]
-         |
-[CWA: auto-ingest -> convert -> library]
+[Shelfmark: try AA (direct_download) first]
+         |-- found --> download into /pool/books/ingest (NFS on fir)
+         |-- not found --> Prowlarr/MAM search -> torrent -> seed on hemlock
+                                                            |
+                                                     /pool/books/ingest
+[CWA: watches /pool/books/ingest, auto-ingest -> convert -> /pool/books/library]
          |
 [Kobo sync / OPDS feeds]
 ```
@@ -99,4 +104,6 @@ quire shelfmark-search "Shroud" "Adrian Tchaikovsky"
 
 ## Status
 
-Pipeline working end to end against a co-located Shelfmark + CWA stack. Deployed on alienlord via the `quire` task in the alienlord ansible repo; runs weekly via cron (Sunday 04:17), emails a summary to `alan.laird@gmail.com`.
+Pipeline working end to end. Deployed on alienlord via the `quire` task in the alienlord ansible repo; runs weekly via cron (Sunday 04:17), emails a summary to `alan.laird@gmail.com`.
+
+Calibre library lives at `/pool/books/library` on fir (NFS-mounted on alienlord as `/mnt/fir/books/library`). MAM torrents seed on hemlock (`/pool/books/seed`) then get imported via mlm into `/pool/books/ingest`.

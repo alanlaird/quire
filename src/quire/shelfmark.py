@@ -11,12 +11,33 @@ from quire.sources import Book
 FORMAT_PRIORITY = ("epub", "mobi", "azw3")
 
 
-def search(shelfmark: ShelfmarkAuth, book: Book) -> list[dict[str, Any]]:
-    query = urlencode({"query": f"{book.title} {book.author}"})
-    url = f"{shelfmark.base_url.rstrip('/')}/api/releases?source=direct_download&{query}"
-    resp = requests.get(url, timeout=60)
+def _search_aa(base_url: str, book: Book) -> list[dict[str, Any]]:
+    params = urlencode({"query": f"{book.title} {book.author}", "source": "direct_download"})
+    resp = requests.get(f"{base_url.rstrip('/')}/api/releases?{params}", timeout=60)
     resp.raise_for_status()
     return resp.json().get("releases", [])
+
+
+def _search_prowlarr(base_url: str, book: Book) -> list[dict[str, Any]]:
+    # MAM entries rarely include subtitles — strip after first comma/colon
+    short_title = book.title.split(",")[0].split(":")[0].strip()
+    params = urlencode({
+        "provider": "manual",
+        "book_id": "prowlarr-search",
+        "title": short_title,
+        "author": book.author,
+        "source": "prowlarr",
+    })
+    resp = requests.get(f"{base_url.rstrip('/')}/api/releases?{params}", timeout=60)
+    resp.raise_for_status()
+    return resp.json().get("releases", [])
+
+
+def search(shelfmark: ShelfmarkAuth, book: Book) -> list[dict[str, Any]]:
+    releases = _search_aa(shelfmark.base_url, book)
+    if not releases:
+        releases = _search_prowlarr(shelfmark.base_url, book)
+    return releases
 
 
 def pick_best(releases: list[dict[str, Any]]) -> dict[str, Any] | None:

@@ -13,8 +13,16 @@ Personal automation. Watches book-list sources (starting with Goodreads Choice A
 
 quire reaches both services over loopback on alienlord, bypassing Caddy entirely. The public stack (managed in `~/web/alienlord`) has a cookie gate at `library.radi8.org` that fronts `shelfmark.radi8.org`; loopback skips that.
 
-- **Shelfmark** — `http://localhost:8084`. No auth required from loopback. Public access is cookie-gated by Caddy; quire avoids that surface by running on-box. In maintenance mode (stable). Download target already wired to CWA ingest.
-- **CWA** — `http://localhost:8083`. Basic auth at the app layer with a dedicated read-only `quire` user (`ROLE_DOWNLOAD | ROLE_VIEWER`, created via direct INSERT into `/var/config/app.db` on 2026-05-23). Public `cwa.radi8.org` is intentionally not behind the cookie gate, but the OPDS endpoint requires basic auth regardless of source IP.
+- **Shelfmark** — `http://localhost:8084`. No auth required from loopback. Public access is cookie-gated by Caddy; quire avoids that surface by running on-box. In maintenance mode (stable). Download target: `/mnt/fir/books/ingest` (NFS from fir).
+- **CWA** — `http://localhost:8083`. Basic auth at the app layer with a dedicated read-only `quire` user (`ROLE_DOWNLOAD | ROLE_VIEWER`, created via direct INSERT into `/var/config/app.db` on 2026-05-23). Public `cwa.radi8.org` is intentionally not behind the cookie gate, but the OPDS endpoint requires basic auth regardless of source IP. Calibre library at `/mnt/fir/books/library` (NFS from fir).
+
+## Download pipeline
+
+Shelfmark tries sources in order:
+1. **AA (direct_download)** — `source=direct_download`, full title+author query; fast, no torrent
+2. **Prowlarr/MAM** — falls back when AA returns nothing; `source=prowlarr` with stripped short title (no subtitle after first `,` or `:`); triggers qBittorrent on hemlock via WireGuard VPN; mlm copies finished downloads to `/pool/books/ingest`
+
+The Prowlarr container runs on hemlock (172.16.16.70 / Tailscale 100.123.227.68:9696). Shelfmark reaches it via Tailscale; the WireGuard PostUp on hemlock adds a bypass route for `100.64.0.0/10` so Tailscale traffic isn't routed through ProtonVPN.
 
 Credentials live in `config.toml` on alienlord (gitignored). A populated `config.template.toml` is checked into the repo. For local dev, SSH-tunnel both ports: `ssh -L 8083:localhost:8083 -L 8084:localhost:8084 alienlord.toad.love`.
 
@@ -46,4 +54,5 @@ quire is deployed to alienlord by the `quire` task in `~/web/alienlord/roles/com
 
 ## Open items (not in PLAN.md)
 
-- (none — Phases 1–7 complete)
+- quire state DB doesn't write "owned" back when book is found in CWA; stays "queued" indefinitely (cosmetic, doesn't affect function)
+- Cixin Liu short story 500s: "The Wandering Earth" anthology already queued when individual story titles arrive — Shelfmark returns 500 "already in queue" for Sun of China, Mountain, Wages of Humanity
