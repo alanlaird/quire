@@ -22,7 +22,7 @@ def gql(api_key: str, query: str, variables: dict | None = None, _attempt: int =
             data = json.loads(resp.read())
     except urllib.error.HTTPError as e:
         body = e.read().decode(errors="replace")
-        if e.code == 429 and _attempt < 5:
+        if (e.code == 429 or e.code >= 500) and _attempt < 5:
             delay = 10 * (2 ** _attempt)
             time.sleep(delay)
             return gql(api_key, query, variables, _attempt + 1)

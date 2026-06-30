@@ -222,22 +222,26 @@ def populate(ctx: click.Context, name: str | None, year: int | None, dry_run: bo
 
         existing_ids = {e["book_id"] for e in hc.get_list_books(config.hardcover.api_key, source.populate_list_id)}
 
-        n_added = n_present = n_missing = 0
+        n_added = n_present = n_missing = n_errors = 0
         for book in books:
-            book_id = book.hardcover_book_id or hc.search_book(config.hardcover.api_key, book.title, book.author)
-            if book_id is None:
-                click.echo(f"  not found:     {book.title} — {book.author}")
-                n_missing += 1
-                continue
-            if book_id in existing_ids:
-                n_present += 1
-                continue
-            if not dry_run:
-                hc.add_to_list(config.hardcover.api_key, source.populate_list_id, book_id)
-            click.echo(f"  {'would add' if dry_run else 'added'}:      {book.title} — {book.author}")
-            n_added += 1
+            try:
+                book_id = book.hardcover_book_id or hc.search_book(config.hardcover.api_key, book.title, book.author)
+                if book_id is None:
+                    click.echo(f"  not found:     {book.title} — {book.author}")
+                    n_missing += 1
+                    continue
+                if book_id in existing_ids:
+                    n_present += 1
+                    continue
+                if not dry_run:
+                    hc.add_to_list(config.hardcover.api_key, source.populate_list_id, book_id)
+                click.echo(f"  {'would add' if dry_run else 'added'}:      {book.title} — {book.author}")
+                n_added += 1
+            except Exception as e:
+                click.echo(f"  error:         {book.title} — {book.author} ({e})")
+                n_errors += 1
 
-        click.echo(f"  done: added={n_added}  already_present={n_present}  not_found={n_missing}")
+        click.echo(f"  done: added={n_added}  already_present={n_present}  not_found={n_missing}  errors={n_errors}")
 
 
 @cli.command()
