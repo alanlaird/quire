@@ -69,6 +69,11 @@ def fetch(source: Source, config: "Config", year: int | None = None) -> list[Boo
                         hardcover_book_id=book_id,
                     ))
         return results
+    if source.kind == "wikipedia_award_table":
+        if source.url_template is None:
+            raise ValueError(f"source {source.name!r} is missing url_template")
+        html = _http_get(source.url_template)
+        return _parse_award_wikitable(html, year=year)
     if source.kind not in _REGISTRY:
         raise ValueError(f"unknown source kind: {source.kind!r}")
     if source.url_template is None:
@@ -93,72 +98,52 @@ def _http_get(url: str) -> str:
     return resp.text
 
 
-@register("nebula_nominees")
-def _nebula_nominees(html: str) -> list[Book]:
-    soup = BeautifulSoup(html, "html.parser")
-    heading = soup.find(
-        lambda t: t.name == "h4" and t.find("a", href=lambda h: h and "best-novel" in h)
-    )
-    if not heading:
-        return []
-    ul = heading.find_next_sibling("ul")
-    if not ul:
-        return []
-    books: list[Book] = []
-    seen: set[tuple[str, str]] = set()
-    for li in ul.find_all("li"):
-        # Each li: <a href="..."><em>Title, by Author (Publisher)</em></a>
-        em = li.find("em") or li.find("i", class_=False)
-        if em is None:
-            a = li.find("a")
-            text = _ws(a.get_text()) if a else ""
-        else:
-            text = _ws(em.get_text())
-        if ", by " not in text:
-            continue
-        title_part, _, author_part = text.partition(", by ")
-        title = _ws(title_part)
-        author = _ws(re.sub(r"\s*\(.*?\)\s*$", "", author_part).rstrip(";").strip())
-        if not title or not author:
-            continue
-        key = (title.lower(), author.lower())
-        if key not in seen:
-            seen.add(key)
-            books.append(Book(title=title, author=author))
-    return books
+def _parse_award_wikitable(html: str, year: int | None = None) -> list[Book]:
+    """Parse a Wikipedia "Award for Best Novel" winners/nominees table.
 
-
-@register("hugo_nominees")
-def _hugo_nominees(html: str) -> list[Book]:
+    These pages share one layout: one or more `wikitable sortable` tables
+    with columns Year [, Year awarded] / Author / Novel / Publisher / Ref
+    (some pages split out a second "Retro" table for years awarded
+    retroactively, with an extra "Year awarded" column — harmless here
+    since it's still a `<th>`, not a `<td>`, so column indexing is
+    unaffected). Year cells use `rowspan` and are only present on a
+    group's first row (`scope="rowgroup"` for multi-nominee years,
+    `scope="row"` for single-nominee years); Novel cells `rowspan`
+    similarly when one book has multiple credited authors. Winners are
+    marked with a trailing `*` in the author cell.
+    """
     soup = BeautifulSoup(html, "html.parser")
-    heading = None
-    for tag in soup.find_all(["h2", "h3", "h4", "strong", "b"]):
-        if "Best Novel" in tag.get_text():
-            heading = tag
-            break
-    if not heading:
-        return []
-    ul = heading.find_next("ul")
-    if not ul:
-        return []
+    tables = soup.find_all("table", class_="wikitable")
     books: list[Book] = []
-    seen: set[tuple[str, str]] = set()
-    for li in ul.find_all("li"):
-        em = li.find("em") or li.find("i")
-        if not em:
-            continue
-        title = _ws(em.get_text())
-        rest = li.get_text()
-        idx = rest.find(title)
-        after = rest[idx + len(title):] if idx != -1 else rest
-        if " by " not in after:
-            continue
-        author_part = after.split(" by ", 1)[1]
-        author = _ws(re.sub(r"\(.*?\)", "", author_part).strip().rstrip(","))
-        if not title or not author:
-            continue
-        key = (title.lower(), author.lower())
-        if key not in seen:
+    seen: set[tuple[int, str, str]] = set()
+    for table in tables:
+        current_year: int | None = None
+        current_title: str | None = None
+        for tr in table.find_all("tr"):
+            th = tr.find("th")
+            if th is not None and th.get("scope") in ("row", "rowgroup"):
+                year_text = _ws(th.get_text())
+                current_year = int(year_text) if year_text.isdigit() else None
+            tds = tr.find_all("td")
+            if not tds or current_year is None:
+                continue
+            author = _ws(tds[0].get_text()).rstrip("*").strip()
+            pen_name = re.search(r"\(as (.+?)\)\s*$", author)
+            if pen_name:
+                # credited under a pseudonym, e.g. "Ursula Vernon (as T. Kingfisher)" —
+                # use the byline the book was actually published under
+                author = pen_name.group(1).strip()
+            if len(tds) >= 2:
+                title = _ws(tds[1].get_text())
+                current_title = re.sub(r"\s*\(also known as.*?\)\s*$", "", title, flags=re.IGNORECASE).strip()
+            title = current_title
+            if not title or not author:
+                continue
+            if year is not None and current_year != year:
+                continue
+            key = (current_year, title.lower(), author.lower())
+            if key in seen:
+                continue
             seen.add(key)
             books.append(Book(title=title, author=author))
     return books

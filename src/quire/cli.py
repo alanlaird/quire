@@ -201,7 +201,7 @@ def check(ctx: click.Context, name: str, year: int | None) -> None:
 
 @cli.command()
 @click.argument("name", required=False, default=None)
-@click.option("--year", type=int, default=None, help="Override the {year} substitution.")
+@click.option("--year", type=int, default=None, help="Override the {year} substitution (scrape sources), or filter to one award year (wikipedia_award_table sources — omit for all years).")
 @click.option("--dry-run", is_flag=True, help="Search Hardcover but don't add to lists.")
 @click.pass_context
 def populate(ctx: click.Context, name: str | None, year: int | None, dry_run: bool) -> None:
