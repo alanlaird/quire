@@ -205,7 +205,7 @@ def check(ctx: click.Context, name: str, year: int | None) -> None:
 @click.option("--dry-run", is_flag=True, help="Search Hardcover but don't add to lists.")
 @click.pass_context
 def populate(ctx: click.Context, name: str | None, year: int | None, dry_run: bool) -> None:
-    """Scrape award nominees and add them to their Hardcover lists."""
+    """Scrape award nominees, or expand a Hardcover list via series, and add to a target list."""
     config: cfg.Config = ctx.obj["config"]
     if config.hardcover is None:
         raise click.ClickException("populate requires [hardcover] config section")
@@ -218,13 +218,13 @@ def populate(ctx: click.Context, name: str | None, year: int | None, dry_run: bo
     for source in sources:
         click.echo(f"[{source.name}] → list {source.populate_list_id}")
         books = src.fetch(source, config, year=year)
-        click.echo(f"  scraped: {len(books)} nominees")
+        click.echo(f"  found: {len(books)} candidates")
 
         existing_ids = {e["book_id"] for e in hc.get_list_books(config.hardcover.api_key, source.populate_list_id)}
 
         n_added = n_present = n_missing = 0
         for book in books:
-            book_id = hc.search_book(config.hardcover.api_key, book.title, book.author)
+            book_id = book.hardcover_book_id or hc.search_book(config.hardcover.api_key, book.title, book.author)
             if book_id is None:
                 click.echo(f"  not found:     {book.title} — {book.author}")
                 n_missing += 1

@@ -46,6 +46,29 @@ def fetch(source: Source, config: "Config", year: int | None = None) -> list[Boo
             Book(title=e["title"], author=e["author"], hardcover_book_id=e["book_id"])
             for e in entries
         ]
+    if source.kind == "hardcover_series":
+        import quire.hardcover as hc
+        if config.hardcover is None:
+            raise ValueError("hardcover_series source requires [hardcover] config section")
+        if source.list_id is None:
+            raise ValueError(f"source {source.name!r} is missing list_id")
+        seed = hc.get_list_books(config.hardcover.api_key, source.list_id)
+        seed_ids = {e["book_id"] for e in seed}
+        seen: set[int] = set()
+        results: list[Book] = []
+        for entry in seed:
+            for series_id in hc.get_book_series_ids(config.hardcover.api_key, entry["book_id"]):
+                for sibling in hc.get_series_books(config.hardcover.api_key, series_id):
+                    book_id = sibling["book_id"]
+                    if book_id in seed_ids or book_id in seen:
+                        continue
+                    seen.add(book_id)
+                    results.append(Book(
+                        title=sibling["title"],
+                        author=sibling["author"],
+                        hardcover_book_id=book_id,
+                    ))
+        return results
     if source.kind not in _REGISTRY:
         raise ValueError(f"unknown source kind: {source.kind!r}")
     if source.url_template is None:

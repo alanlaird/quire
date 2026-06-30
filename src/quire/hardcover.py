@@ -99,6 +99,54 @@ def add_to_list(api_key: str, list_id: int, book_id: int) -> None:
     )
 
 
+def get_book_series_ids(api_key: str, book_id: int) -> list[int]:
+    """Return the series_ids a book belongs to."""
+    d = gql(
+        api_key,
+        "query($bid: Int!) { book_series(where: {book_id: {_eq: $bid}}) { series_id } }",
+        {"bid": book_id},
+    )
+    return [e["series_id"] for e in d["book_series"]]
+
+
+def get_series_books(api_key: str, series_id: int) -> list[dict]:
+    """Return [{book_id, title, author, position}, ...] for a series.
+
+    Series entries often have multiple editions per position (translations,
+    box sets) — keeps the highest users_count edition per position and drops
+    compilations entirely.
+    """
+    d = gql(
+        api_key,
+        "query($sid: Int!) {"
+        "  book_series(where: {series_id: {_eq: $sid}}) {"
+        "    position"
+        "    book { id title users_count compilation contributions(limit: 1) { author { name } } }"
+        "  }"
+        "}",
+        {"sid": series_id},
+    )
+    best: dict[float | None, dict] = {}
+    for entry in d["book_series"]:
+        book = entry["book"]
+        if book.get("compilation"):
+            continue
+        position = entry.get("position")
+        users_count = book.get("users_count") or 0
+        existing = best.get(position)
+        if existing is not None and users_count <= existing["users_count"]:
+            continue
+        contribs = book.get("contributions") or []
+        best[position] = {
+            "book_id": book["id"],
+            "title": book.get("title") or "",
+            "author": contribs[0]["author"]["name"] if contribs else "",
+            "position": position,
+            "users_count": users_count,
+        }
+    return sorted(best.values(), key=lambda b: (b["position"] is None, b["position"] or 0))
+
+
 def search_book(api_key: str, title: str, author: str) -> int | None:
     """Search Hardcover by title+author, return book_id or None."""
     d = gql(
