@@ -237,6 +237,7 @@ def populate(ctx: click.Context, name: str | None, year: int | None, dry_run: bo
                     hc.add_to_list(config.hardcover.api_key, source.populate_list_id, book_id)
                 click.echo(f"  {'would add' if dry_run else 'added'}:      {book.title} — {book.author}")
                 n_added += 1
+                existing_ids.add(book_id)
             except Exception as e:
                 click.echo(f"  error:         {book.title} — {book.author} ({e})")
                 n_errors += 1
