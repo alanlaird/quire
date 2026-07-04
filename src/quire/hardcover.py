@@ -109,19 +109,33 @@ def get_book_series_ids(api_key: str, book_id: int) -> list[int]:
     return [e["series_id"] for e in d["book_series"]]
 
 
+# Graphic Novel, Research Paper, Poetry, Collection — never a novel-series entry we want.
+_NON_NOVEL_CATEGORY_IDS = {4, 6, 7, 8}
+# Below this, an edition is almost always a foreign translation, single comic issue, or
+# other low-engagement noise rather than a real numbered volume (see get_series_books).
+MIN_USERS_COUNT = 20
+
+
 def get_series_books(api_key: str, series_id: int) -> list[dict]:
     """Return [{book_id, title, author, position}, ...] for a series.
 
     Series entries often have multiple editions per position (translations,
     box sets) — keeps the highest users_count edition per position and drops
-    compilations entirely.
+    compilations entirely. Hardcover's community-entered `position` values
+    aren't always consistent though: a foreign translation of an existing
+    volume sometimes gets tagged with a different position number instead of
+    colliding with (and losing to) the real edition at the correct position,
+    which would let it slip past the per-position dedup above. A minimum
+    users_count catches these, since real editions of anything popular
+    enough to be a series entry have far more readers than a stray
+    mistagged translation or single comic/magazine issue.
     """
     d = gql(
         api_key,
         "query($sid: Int!) {"
         "  book_series(where: {series_id: {_eq: $sid}}) {"
         "    position"
-        "    book { id title users_count compilation contributions(limit: 1) { author { name } } }"
+        "    book { id title users_count compilation book_category_id contributions(limit: 1) { author { name } } }"
         "  }"
         "}",
         {"sid": series_id},
@@ -129,7 +143,7 @@ def get_series_books(api_key: str, series_id: int) -> list[dict]:
     best: dict[float | None, dict] = {}
     for entry in d["book_series"]:
         book = entry["book"]
-        if book.get("compilation"):
+        if book.get("compilation") or book.get("book_category_id") in _NON_NOVEL_CATEGORY_IDS:
             continue
         position = entry.get("position")
         users_count = book.get("users_count") or 0
@@ -144,7 +158,10 @@ def get_series_books(api_key: str, series_id: int) -> list[dict]:
             "position": position,
             "users_count": users_count,
         }
-    return sorted(best.values(), key=lambda b: (b["position"] is None, b["position"] or 0))
+    return sorted(
+        (b for b in best.values() if b["users_count"] >= MIN_USERS_COUNT),
+        key=lambda b: (b["position"] is None, b["position"] or 0),
+    )
 
 
 def search_book(api_key: str, title: str, author: str) -> int | None:
