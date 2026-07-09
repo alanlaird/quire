@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 import re
 from dataclasses import dataclass, field
 from datetime import date
@@ -74,6 +76,11 @@ def fetch(source: Source, config: "Config", year: int | None = None) -> list[Boo
             raise ValueError(f"source {source.name!r} is missing url_template")
         html = _http_get(source.url_template)
         return _parse_award_wikitable(html, year=year)
+    if source.kind == "award_sheet_csv":
+        if source.url_template is None:
+            raise ValueError(f"source {source.name!r} is missing url_template")
+        text = _http_get(source.url_template)
+        return _parse_award_sheet_csv(text, column=source.column)
     if source.kind not in _REGISTRY:
         raise ValueError(f"unknown source kind: {source.kind!r}")
     if source.url_template is None:
@@ -146,6 +153,36 @@ def _parse_award_wikitable(html: str, year: int | None = None) -> list[Book]:
                 continue
             seen.add(key)
             books.append(Book(title=title, author=author))
+    return books
+
+
+def _parse_award_sheet_csv(text: str, column: str | None = None) -> list[Book]:
+    """Parse the "SF book awards & best-of consensus" Google Sheet CSV export.
+
+    One row per book, with a ✓/× cell per award / best-of-list column
+    ("Hugo", "Locus SF & F Award", "SF Masterworks", ...). `column` filters
+    to rows ticked ✓ for that column; omit it to return every row. It's a
+    curated consensus list, not an exhaustive nominee roll — see books.md
+    (alienlord) "award data sources surveyed" for the caveats.
+
+    Multi-author rows use "A & B" (e.g. "Mark Clifton & Frank Riley") —
+    only the first-credited author is kept, since that's enough for the
+    Hardcover title+author search to resolve the book.
+    """
+    books: list[Book] = []
+    seen: set[tuple[str, str]] = set()
+    for row in csv.DictReader(io.StringIO(text)):
+        if column is not None and _ws(row.get(column) or "") != "✓":
+            continue
+        title = _ws(row.get("Book Title") or "")
+        author = _ws((row.get("Author") or "").split("&")[0])
+        if not title or not author:
+            continue
+        key = (title.lower(), author.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        books.append(Book(title=title, author=author))
     return books
 
 

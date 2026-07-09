@@ -221,14 +221,20 @@ def populate(ctx: click.Context, name: str | None, year: int | None, dry_run: bo
         click.echo(f"  found: {len(books)} candidates")
 
         existing_ids = {e["book_id"] for e in hc.get_list_books(config.hardcover.api_key, source.populate_list_id)}
+        excluded_ids: set[int] = set()
+        if source.exclude_list_id is not None:
+            excluded_ids = {e["book_id"] for e in hc.get_list_books(config.hardcover.api_key, source.exclude_list_id)}
 
-        n_added = n_present = n_missing = n_errors = 0
+        n_added = n_present = n_missing = n_excluded = n_errors = 0
         for book in books:
             try:
                 book_id = book.hardcover_book_id or hc.search_book(config.hardcover.api_key, book.title, book.author)
                 if book_id is None:
                     click.echo(f"  not found:     {book.title} — {book.author}")
                     n_missing += 1
+                    continue
+                if book_id in excluded_ids:
+                    n_excluded += 1
                     continue
                 if book_id in existing_ids:
                     n_present += 1
@@ -242,7 +248,8 @@ def populate(ctx: click.Context, name: str | None, year: int | None, dry_run: bo
                 click.echo(f"  error:         {book.title} — {book.author} ({e})")
                 n_errors += 1
 
-        click.echo(f"  done: added={n_added}  already_present={n_present}  not_found={n_missing}  errors={n_errors}")
+        excluded_part = f"  excluded={n_excluded}" if source.exclude_list_id is not None else ""
+        click.echo(f"  done: added={n_added}  already_present={n_present}  not_found={n_missing}{excluded_part}  errors={n_errors}")
 
 
 @cli.command()

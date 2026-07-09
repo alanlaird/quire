@@ -31,6 +31,8 @@ class Source:
     url_template: str | None = None
     list_id: int | None = None        # for hardcover_list sources: read FROM this list
     populate_list_id: int | None = None  # for scrape sources: write TO this list
+    column: str | None = None         # for award_sheet_csv: only rows ticked ✓ in this column
+    exclude_list_id: int | None = None   # for populate: skip books already on this list (e.g. Owned)
 
 
 @dataclass(frozen=True)
