@@ -79,7 +79,7 @@ def fetch(source: Source, config: "Config", year: int | None = None) -> list[Boo
     if source.kind == "award_sheet_csv":
         if source.url_template is None:
             raise ValueError(f"source {source.name!r} is missing url_template")
-        text = _http_get(source.url_template)
+        text = _http_get(source.url_template, force_utf8=True)
         return _parse_award_sheet_csv(text, column=source.column)
     if source.kind not in _REGISTRY:
         raise ValueError(f"unknown source kind: {source.kind!r}")
@@ -99,9 +99,13 @@ def _ws(s: str) -> str:
     return " ".join(s.split())
 
 
-def _http_get(url: str) -> str:
+def _http_get(url: str, force_utf8: bool = False) -> str:
     resp = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=30)
     resp.raise_for_status()
+    if force_utf8:
+        # Google's CSV export answers `text/csv` with no charset, so requests
+        # falls back to ISO-8859-1 and mangles the ✓ cells into mojibake.
+        resp.encoding = "utf-8"
     return resp.text
 
 
