@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import click
+import requests
 
 from quire import config as cfg
 from quire import cwa as cwa_client
@@ -61,7 +62,11 @@ def run(ctx: click.Context, dry_run: bool, year: int | None, no_email: bool) -> 
                     if not dry_run:
                         st.mark_owned(conn, source.name, book)
                     continue
-                releases = sm.search(config.shelfmark, book)
+                try:
+                    releases = sm.search(config.shelfmark, book)
+                except requests.exceptions.RequestException as e:
+                    click.echo(f"  search error: {e} — skipping {book.title}")
+                    continue
                 best = sm.pick_best(releases)
                 if best is None:
                     line = f"{book.title} — {book.author}"
