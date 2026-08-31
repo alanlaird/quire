@@ -36,13 +36,35 @@ def _search_prowlarr(base_url: str, book: Book) -> list[dict[str, Any]]:
     return resp.json().get("releases", [])
 
 
+def _search_newznab(base_url: str, book: Book) -> list[dict[str, Any]]:
+    params = urlencode({
+        "provider": "manual",
+        "book_id": "newznab-search",
+        "title": book.title,
+        "author": book.author,
+        "source": "newznab",
+    })
+    resp = requests.get(f"{base_url.rstrip('/')}/api/releases?{params}", timeout=60)
+    resp.raise_for_status()
+    return resp.json().get("releases", [])
+
+
 def search(shelfmark: ShelfmarkAuth, book: Book) -> list[dict[str, Any]]:
+    # Usenet first: fast, no Cloudflare bypass drama, no MAM-account-abuse
+    # risk — worth checking even though its book catalog is smaller than
+    # AA's or MAM's, since a hit there costs nothing on either of the other
+    # two. Falls through to AA, then MAM/torrent, on a miss or any error.
     try:
-        releases = _search_aa(shelfmark.base_url, book)
+        releases = _search_newznab(shelfmark.base_url, book)
     except requests.exceptions.RequestException:
-        # AA down/blocked/timed out — fall through to the Prowlarr/torrent
-        # source below instead of failing the whole search.
         releases = []
+    if not releases:
+        try:
+            releases = _search_aa(shelfmark.base_url, book)
+        except requests.exceptions.RequestException:
+            # AA down/blocked/timed out — fall through to the Prowlarr/torrent
+            # source below instead of failing the whole search.
+            releases = []
     if not releases:
         releases = _search_prowlarr(shelfmark.base_url, book)
     return releases
