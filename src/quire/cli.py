@@ -279,7 +279,10 @@ def shelfmark_search(ctx: click.Context, title: str, author: str) -> None:
     releases = sm.search(config.shelfmark, src.Book(title=title, author=author))
     click.echo(f"{len(releases)} releases")
     for r in releases:
-        click.echo(f"  {r.get('format'):<6} {r.get('size'):<8} {r.get('indexer'):<20} {r.get('title')}")
+        fmt = r.get("format") or "?"
+        size = r.get("size") or "?"
+        indexer = r.get("indexer") or "?"
+        click.echo(f"  {fmt:<6} {size:<8} {indexer:<20} {r.get('title')}")
     best = sm.pick_best(releases)
     if best is not None:
-        click.echo(f"best: {best.get('format')} {best.get('size')} ({best.get('source_id')})")
+        click.echo(f"best: {best.get('format') or '?'} {best.get('size') or '?'} ({best.get('source_id')})")

@@ -70,10 +70,28 @@ def search(shelfmark: ShelfmarkAuth, book: Book) -> list[dict[str, Any]]:
     return releases
 
 
+def _release_format(release: dict[str, Any]) -> str:
+    """The release's format, falling back to sniffing it out of the title.
+
+    Newznab (and possibly Prowlarr/torrent) results routinely come back with
+    `format: null` — NZB/torrent search results don't carry structured
+    per-file metadata the way AA's listings do, but the format is almost
+    always spelled out in the title text (e.g. "...Retail.EPUB.eBook-...").
+    """
+    fmt = (release.get("format") or "").lower()
+    if fmt:
+        return fmt
+    title = (release.get("title") or "").lower()
+    for candidate in FORMAT_PRIORITY:
+        if candidate in title:
+            return candidate
+    return ""
+
+
 def pick_best(releases: list[dict[str, Any]]) -> dict[str, Any] | None:
     for fmt in FORMAT_PRIORITY:
         for r in releases:
-            if (r.get("format") or "").lower() == fmt:
+            if _release_format(r) == fmt:
                 return r
     return None
 
