@@ -13,7 +13,10 @@ FORMAT_PRIORITY = ("epub", "mobi", "azw3")
 
 def _search_aa(base_url: str, book: Book) -> list[dict[str, Any]]:
     params = urlencode({"query": f"{book.title} {book.author}", "source": "direct_download"})
-    resp = requests.get(f"{base_url.rstrip('/')}/api/releases?{params}", timeout=60)
+    # Shelfmark's Cloudflare bypasser against Anna's Archive can burn ~90s across
+    # its retry ladder before giving up; give it room to actually finish instead
+    # of us aborting first and never finding out whether it would have worked.
+    resp = requests.get(f"{base_url.rstrip('/')}/api/releases?{params}", timeout=100)
     resp.raise_for_status()
     return resp.json().get("releases", [])
 
@@ -34,7 +37,12 @@ def _search_prowlarr(base_url: str, book: Book) -> list[dict[str, Any]]:
 
 
 def search(shelfmark: ShelfmarkAuth, book: Book) -> list[dict[str, Any]]:
-    releases = _search_aa(shelfmark.base_url, book)
+    try:
+        releases = _search_aa(shelfmark.base_url, book)
+    except requests.exceptions.RequestException:
+        # AA down/blocked/timed out — fall through to the Prowlarr/torrent
+        # source below instead of failing the whole search.
+        releases = []
     if not releases:
         releases = _search_prowlarr(shelfmark.base_url, book)
     return releases
