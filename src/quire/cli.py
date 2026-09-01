@@ -33,8 +33,9 @@ def cli(ctx: click.Context, config_path: Path | None) -> None:
 @click.option("--dry-run", is_flag=True, help="Search Shelfmark but don't trigger downloads, write state, or send email.")
 @click.option("--year", type=int, default=None, help="Override the {year} substitution in source URLs (default: current year from Nov on, previous year otherwise).")
 @click.option("--no-email", is_flag=True, help="Don't send the summary email (live run only).")
+@click.option("--limit", type=int, default=None, help="Stop after this many Shelfmark searches (books already owned/terminal don't count). Lets a big backlog be worked through in small batches instead of hammering AA/MAM/usenet in one run.")
 @click.pass_context
-def run(ctx: click.Context, dry_run: bool, year: int | None, no_email: bool) -> None:
+def run(ctx: click.Context, dry_run: bool, year: int | None, no_email: bool, limit: int | None) -> None:
     config: cfg.Config = ctx.obj["config"]
     queued_lines: list[str] = []
     missed_lines: list[str] = []
@@ -42,6 +43,7 @@ def run(ctx: click.Context, dry_run: bool, year: int | None, no_email: bool) -> 
     skipped_owned = 0
     skipped_state = 0
     body_lines: list[str] = []
+    searched = 0
 
     click.echo("loading CWA library...")
     library = cwa_client.load_library(config.cwa)
@@ -49,10 +51,15 @@ def run(ctx: click.Context, dry_run: bool, year: int | None, no_email: bool) -> 
 
     with st.open(config.state_path) as conn:
         for source in (s for s in config.sources if s.populate_list_id is None):
+            if limit is not None and searched >= limit:
+                break
             click.echo(f"[{source.name}]")
             body_lines.append(f"[{source.name}]")
             books = src.fetch(source, config, year=year)
             for book in books:
+                if limit is not None and searched >= limit:
+                    click.echo(f"  --limit {limit} reached, stopping")
+                    break
                 prior = st.get(conn, source.name, book)
                 if st.is_terminal(prior):
                     skipped_state += 1
@@ -62,6 +69,7 @@ def run(ctx: click.Context, dry_run: bool, year: int | None, no_email: bool) -> 
                     if not dry_run:
                         st.mark_owned(conn, source.name, book)
                     continue
+                searched += 1
                 try:
                     releases = sm.search(config.shelfmark, book)
                 except requests.exceptions.RequestException as e:
