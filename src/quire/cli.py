@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import click
@@ -75,6 +76,12 @@ def run(ctx: click.Context, dry_run: bool, year: int | None, no_email: bool, lim
                 except requests.exceptions.RequestException as e:
                     click.echo(f"  search error: {e} — skipping {book.title}")
                     continue
+                finally:
+                    # Paces every search, not just ones that hit Prowlarr/MAM -
+                    # a burst of back-to-back searches (most fall through to
+                    # MAM on a newznab/AA miss) was tripping Prowlarr's
+                    # circuit-breaker on the MyAnonamouse indexer.
+                    time.sleep(config.shelfmark.search_delay)
                 best = sm.pick_best(releases)
                 if best is None:
                     line = f"{book.title} — {book.author}"

@@ -16,6 +16,11 @@ class CWAAuth:
 @dataclass(frozen=True)
 class ShelfmarkAuth:
     base_url: str
+    # Paced between every per-book search (see quire.cli.run), not just ones
+    # that reach Prowlarr/MAM - simplest to apply uniformly, and newznab/AA
+    # misses are the common case that falls through to MAM anyway. Default
+    # matches the spacing private trackers like MAM expect between searches.
+    search_delay: float = 10.0
 
 
 @dataclass(frozen=True)
